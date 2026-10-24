@@ -1,15 +1,35 @@
 name: Jekyll Site CI
 
+# main에 직접 push될 때 + 데이터 자동 수집 워크플로가 끝났을 때 사이트를 다시 배포합니다.
+# (자동 수집 봇이 GITHUB_TOKEN으로 올린 커밋은 push 트리거를 깨우지 못하므로 workflow_run으로 연결)
 on:
   push:
     branches:
       - main
+  workflow_run:
+    workflows:
+      - "실거래가 자동 갱신 (구리시)"
+      - "부동산 뉴스·정책 자동 수집"
+      - "상가 상권정보 자동 갱신 (입지분석)"
+      - "단지 좌표 미리 계산 (지도)"
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -21,7 +41,7 @@ jobs:
       - name: Build Site
         run: bundle exec jekyll build
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./_site
